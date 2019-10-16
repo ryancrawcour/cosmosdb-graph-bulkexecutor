@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 
 using GraphBulkImporter;
 using Microsoft.Azure.CosmosDB.BulkExecutor.Graph.Element;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json;
 
 
 namespace Test
@@ -125,6 +128,38 @@ namespace Test
             Assert.AreEqual("label", gv.Label); 
             Assert.AreEqual(obj.Age, gv.GetVertexProperties("partitionKey").FirstOrDefault().Value);
             Assert.IsTrue(gv.GetVertexProperties().Count<GremlinVertexProperty>() == 3);
+        }
+
+        [TestMethod]
+        public void BuildsFromNewtonsoftDeserializedObject()
+        {
+            const string idval = "id";
+            const string pkval = "pk value";
+
+            string serializedObject = JsonConvert.SerializeObject(new { Id = idval, partitionKey = pkval });
+            dynamic deserializedObject = JsonConvert.DeserializeObject(serializedObject);
+
+            GremlinVertex gv = ((object)deserializedObject).ToGremlinVertex();
+            Assert.AreEqual(idval, gv.Id);
+            Assert.AreEqual(pkval, gv.GetVertexProperties("partitionKey").FirstOrDefault().Value.ToString());
+        }
+
+        [DataTestMethod]
+        [DataRow("id", "partitionkey")]
+        [DataRow("iD", "partitionKey")]
+        [DataRow("ID", "PARtitionKey")]
+        public void BuildsFromExpandObjectWithDifferentCasingVariations(string idPropertyName, string partitionKeyPropertyName)
+        {
+            const string idValue = "id";
+            const string primaryKeyValue = "pk value";
+
+            dynamic dynamicObject = new ExpandoObject();
+            ((IDictionary<string, object>) dynamicObject).Add(idPropertyName, idValue);
+            ((IDictionary<string, object>) dynamicObject).Add(partitionKeyPropertyName, primaryKeyValue);
+
+            GremlinVertex gv = ((object) dynamicObject).ToGremlinVertex();
+            Assert.AreEqual(idValue, gv.Id);
+            Assert.AreEqual(primaryKeyValue, gv.GetVertexProperties("partitionKey").FirstOrDefault().Value.ToString());
         }
     }
 }

@@ -1,11 +1,8 @@
-﻿using Microsoft.Azure.CosmosDB.BulkExecutor.Graph.Element;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+
+using Microsoft.Azure.CosmosDB.BulkExecutor.Graph.Element;
 
 namespace GraphBulkImporter
 {
@@ -25,19 +22,20 @@ namespace GraphBulkImporter
         /// </returns>
         public static GremlinVertex ToGremlinVertex(this object obj)
         {
-            var label = obj.GetType().Name;
+            var typeName = obj.GetType().Name;
             
             if (!obj.HasProperty("id"))
             {
-                throw new ArgumentException($"{label} does not have expected property.", "id");
+                throw new MissingFieldException($"{typeName} does not have expected property.", "id");
             }
 
             if (!obj.HasProperty("partitionKey"))
             {
-                throw new ArgumentException($"{label} does not have expected property.", "partitionKey");
+                throw new MissingFieldException($"{typeName} does not have expected property.", "partitionKey");
             }
 
-            return ToGremlinVertex(obj, "id", "partitionKey", label);
+            //GremlineVertex has a Label property that is required. So GremlinVertex.Label == typeName.
+            return ToGremlinVertex(obj, "id", "partitionKey", typeName);
         }
 
         /// <summary>
@@ -45,15 +43,15 @@ namespace GraphBulkImporter
         /// </summary>
         /// <param name="idProperty">Which property of the object should be used for id of the GremlinVertex, defaults to "id"</param>
         /// <param name="partitionKeyProperty">Which property should be used for partitionKey of the GremlinVertex, defaults to "partitionKey"</param>
-        /// <param name="label">What value should be used for the label property, defaults to the Type name of the object</param>
+        /// <param name="vertexLabel">What value should be used for the label property, defaults to the Type name of the object</param>
         /// <returns>
         /// A new instance of a GremlinVertex
         /// with its id and partitionKey property values set to and <typeparamref name="idProperty"/> and <typeparamref name="partitionKeyProeprty"/> properties respectively
         /// and the label property set to the value of <typeparamref name="label"/>
         /// </returns>
-        public static GremlinVertex ToGremlinVertex(this object obj, string idProperty,  string partitionKeyProperty, string label)
+        public static GremlinVertex ToGremlinVertex(this object obj, string idProperty,  string partitionKeyProperty, string vertexLabel)
         {
-            if (string.IsNullOrEmpty(idProperty))
+            if (string.IsNullOrWhiteSpace(idProperty))
             {
                 throw new ArgumentException($"{nameof(idProperty)} cannot be Null or Empty", nameof(idProperty));
             }
@@ -63,21 +61,21 @@ namespace GraphBulkImporter
                 throw new ArgumentException($"{nameof(partitionKeyProperty)} cannot be Null or Empty", nameof(partitionKeyProperty));
             }
 
-            if (string.IsNullOrWhiteSpace(label))
+            if (string.IsNullOrWhiteSpace(vertexLabel))
             {
-                throw new ArgumentException($"{nameof(label)} cannot be Null or Empty", nameof(label));
+                throw new ArgumentException($"{nameof(vertexLabel)} cannot be Null or Empty", nameof(vertexLabel));
             }
 
-            var gv = new GremlinVertex(obj.GetPropertyValue(idProperty).ToString(), label);
+            var gv = new GremlinVertex(obj.GetPropertyValue(idProperty).ToString(), vertexLabel);
             gv.AddProperty(new GremlinVertexProperty("partitionKey", obj.GetPropertyValue(partitionKeyProperty)));
 
-            foreach (var prop in obj.GetType().GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
-            {
-                var name = prop.Name;
-                var val = prop.GetValue(obj);
+            //Get a list of all Properties, except where the name is "id" or "partitionKey"
+            var props = obj.GetType().GetProperties()
+                .Where(x => !x.Name.Equals("id", StringComparison.InvariantCultureIgnoreCase)
+                && !x.Name.Equals("partitionKey", StringComparison.InvariantCultureIgnoreCase));
 
-                if (!name.Equals("id", StringComparison.InvariantCultureIgnoreCase) && !name.Equals("partitionKey", StringComparison.InvariantCultureIgnoreCase))
-                    gv.AddProperty(new GremlinVertexProperty(name, val));
+            foreach (var prop in props) {           
+                gv.AddProperty(new GremlinVertexProperty(prop.Name, prop.GetValue(obj)));
             }
 
             return gv;
@@ -94,8 +92,7 @@ namespace GraphBulkImporter
         }
         private static object GetPropertyValue(this object obj, string propertyName)
         {
-            var prop = GetPropertyInfo(obj, propertyName);
-            if (prop == null) throw new ArgumentException($"No {propertyName} property found.", propertyName);
+            var prop = GetPropertyInfo(obj, propertyName)??throw new MissingFieldException($"No {propertyName} property found.", propertyName);
 
             return prop.GetValue(obj);
         }

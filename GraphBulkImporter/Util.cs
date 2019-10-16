@@ -1,17 +1,16 @@
-﻿namespace GraphBulkImporter
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Configuration;
+using System.Linq;
+using System.Threading.Tasks;
+
+using Microsoft.Azure.CosmosDB.BulkExecutor.Graph.Element;
+using Microsoft.Azure.Documents;
+using Microsoft.Azure.Documents.Client;
+
+namespace GraphBulkImporter
 {
-    using GraphBulkImporter.Models;
-    using Microsoft.Azure.CosmosDB.BulkExecutor.Graph.Element;
-    using Microsoft.Azure.Documents;
-    using Microsoft.Azure.Documents.Client;
-
-    using System;
-    using System.Collections.Generic;
-    using System.Collections.ObjectModel;
-    using System.Configuration;
-    using System.Linq;
-    using System.Threading.Tasks;
-
     internal sealed class Utils
     {
         /// <summary>
@@ -51,18 +50,12 @@
             };
             DocumentCollection collection = new DocumentCollection { Id = collectionName, PartitionKey = partitionKey };
 
-            try
-            {
-                collection = await client.CreateDocumentCollectionAsync(
-                    UriFactory.CreateDatabaseUri(databaseName),
-                    collection,
-                    new RequestOptions { OfferThroughput = collectionThroughput });
-            }
-            catch (Exception e)
-            {
-                throw e;
-            }
 
+            collection = await client.CreateDocumentCollectionAsync(
+                UriFactory.CreateDatabaseUri(databaseName),
+                collection,
+                new RequestOptions { OfferThroughput = collectionThroughput });
+            
             return collection;
         }
 

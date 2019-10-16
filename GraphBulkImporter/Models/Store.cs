@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace GraphBulkImporter.Models
 {
@@ -10,18 +6,13 @@ namespace GraphBulkImporter.Models
     {
         public Point(Position position)
         {
-            if (position == null)
-            {
-                throw new ArgumentNullException("position");
-            }
-
-            this.coordinates = position;
+            this.coordinates = position ?? throw new ArgumentNullException(nameof(position));
         }
 
         public readonly string type = "Point";
         public Position coordinates { get; private set; }
     }
-    public class Position
+    public sealed class Position
     {
         internal double longitude { get; set; }
         internal double latitude { get; set; }
@@ -35,18 +26,18 @@ namespace GraphBulkImporter.Models
 
     class Store
     {
-        public int id { get { return this.storeNbr; } }
-        public string cbsAName { get; set; }
-        public string city { get; set; }
-        public string county { get; set; }
-        public short countyType { get; set; }
-        public Boolean isActive { get; set; }
-        public string stateCode { get; set; }
-        public string state { get; set; }
-        public Point location { get; set; }
-        public string name { get; set; }
-        public int storeNbr { get; set; }
-        public string storeStatus { get; set; }
-        public string storeType { get; set; }
+        public int Id { get { return this.StoreNbr; } }
+        public string CBSName { get; set; }
+        public string City { get; set; }
+        public string County { get; set; }
+        public short CountyType { get; set; }
+        public Boolean IsActive { get; set; }
+        public string StateCode { get; set; }
+        public string State { get; set; }
+        public Point Location { get; set; }
+        public string Name { get; set; }
+        public int StoreNbr { get; set; }
+        public string StoreStatus { get; set; }
+        public string StoreType { get; set; }
     }
 }

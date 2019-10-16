@@ -1,18 +1,18 @@
-﻿namespace GraphBulkImporter
+﻿using System;
+using System.Configuration;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+
+using Microsoft.Azure.Documents;
+using Microsoft.Azure.Documents.Client;
+using Microsoft.Azure.CosmosDB.BulkExecutor;
+using Microsoft.Azure.CosmosDB.BulkExecutor.BulkImport;
+using Microsoft.Azure.CosmosDB.BulkExecutor.Graph;
+using GraphBulkImporter.Models;
+
+namespace GraphBulkImporter
 { 
-    using System;
-    using System.Configuration;
-    using System.Diagnostics;
-    using System.Threading;
-    using System.Threading.Tasks;
-
-    using Microsoft.Azure.Documents;
-    using Microsoft.Azure.Documents.Client;
-    using Microsoft.Azure.CosmosDB.BulkExecutor;
-    using Microsoft.Azure.CosmosDB.BulkExecutor.BulkImport;
-    using Microsoft.Azure.CosmosDB.BulkExecutor.Graph;
-    using GraphBulkImporter.Models;
-
     class Program
     {
         private static readonly string EndpointUrl = ConfigurationManager.AppSettings["EndPointUrl"];
@@ -33,8 +33,8 @@
         {
             Trace.WriteLine("Summary:");
             Trace.WriteLine("--------------------------------------------------------------------- ");
-            Trace.WriteLine(String.Format("Endpoint: {0}", EndpointUrl));
-            Trace.WriteLine(String.Format("Collection : {0}.{1}", DatabaseName, CollectionName));
+            Trace.WriteLine($"Endpoint: {EndpointUrl}");
+            Trace.WriteLine($"Collection : {DatabaseName}.{CollectionName}");
             Trace.WriteLine("--------------------------------------------------------------------- ");
             Trace.WriteLine("");
 
@@ -50,7 +50,7 @@
             }
             catch (AggregateException e)
             {
-                Trace.TraceError("Caught AggregateException in Main, Inner Exception:\n" + e);
+                Trace.TraceError($"Caught AggregateException in Main, Inner Exception:\n{e.ToString()}");
                 Console.ReadKey();
             }
 
@@ -70,10 +70,10 @@
                         await client.DeleteDatabaseAsync(database.SelfLink);
                     }
 
-                    Trace.TraceInformation("Creating database {0}", DatabaseName);
+                    Trace.TraceInformation($"Creating database {DatabaseName}");
                     database = await client.CreateDatabaseAsync(new Database { Id = DatabaseName });
 
-                    Trace.TraceInformation(String.Format("Creating collection {0} with {1} RU/s", CollectionName, CollectionThroughput));
+                    Trace.TraceInformation($"Creating collection {CollectionName} with {CollectionThroughput} RU/s");
                     dataCollection = await Utils.CreatePartitionedCollectionAsync(client, DatabaseName, CollectionName, CollectionThroughput);
                 }
                 else
@@ -87,7 +87,7 @@
             }
             catch (Exception de)
             {
-                Trace.TraceError("Unable to initialize, exception message: {0}", de.Message);
+                Trace.TraceError($"Unable to initialize, exception message:\n{de.ToString()}");
                 throw;
             }
 
@@ -134,36 +134,38 @@
             }
             catch (DocumentClientException de)
             {
-                Trace.TraceError("Document client exception: {0}", de);
+                Trace.TraceError($"Document Client Exception:\n{de.ToString()}");
             }
             catch (Exception e)
             {
-                Trace.TraceError("Exception: {0}", e);
+                Trace.TraceError($"Exception:\n{e.ToString()}");
             }
+
+            var vertexCount = vResponse.NumberOfDocumentsImported;
+            var vertexTime = vResponse.TotalTimeTaken.TotalSeconds;
+            var vertexRU = vResponse.TotalRequestUnitsConsumed;
+
+            var edgeCount = eResponse.NumberOfDocumentsImported;
+            var edgeTime = eResponse.TotalTimeTaken.TotalSeconds;
+            var edgeRU = eResponse.TotalRequestUnitsConsumed;
+            
+            var graphElementCount = vertexCount + edgeCount;
+            var totalTime = vertexTime + edgeCount;
+            var totalRU = vertexRU + edgeRU;
+
+            var writesPerSec = Math.Round(vertexCount / totalTime);
+            var ruPerSec = Math.Round(totalRU / totalTime);
 
             Console.WriteLine("\nSummary for batch");
             Console.WriteLine("--------------------------------------------------------------------- ");
-            Console.WriteLine(
-                "Inserted {0} graph elements ({1} vertices, {2} edges) @ {3} writes/s, {4} RU/s in {5} sec)",
-                vResponse.NumberOfDocumentsImported + eResponse.NumberOfDocumentsImported,
-                vResponse.NumberOfDocumentsImported,
-                eResponse.NumberOfDocumentsImported,
-                Math.Round(
-                    (vResponse.NumberOfDocumentsImported) /
-                    (vResponse.TotalTimeTaken.TotalSeconds + eResponse.TotalTimeTaken.TotalSeconds)),
-                Math.Round(
-                    (vResponse.TotalRequestUnitsConsumed + eResponse.TotalRequestUnitsConsumed) /
-                    (vResponse.TotalTimeTaken.TotalSeconds + eResponse.TotalTimeTaken.TotalSeconds)),
-                vResponse.TotalTimeTaken.TotalSeconds + eResponse.TotalTimeTaken.TotalSeconds);
-            Console.WriteLine(
-                "Average RU consumption per insert: {0}",
-                (vResponse.TotalRequestUnitsConsumed + eResponse.TotalRequestUnitsConsumed) /
-                (vResponse.NumberOfDocumentsImported + eResponse.NumberOfDocumentsImported));
-            Console.WriteLine("---------------------------------------------------------------------\n ");
+            Console.WriteLine($"Inserted {graphElementCount} graph elements ({vertexCount} vertices, {edgeCount} edges) " +
+                              $"@ {writesPerSec} writes/s, {ruPerSec} RU/s in {totalTime} sec");
+            Console.WriteLine($"Average RU consumption per insert: {totalRU / graphElementCount}");
+            Console.WriteLine("---------------------------------------------------------------------\n");
 
             if (vResponse.BadInputDocuments.Count > 0 || eResponse.BadInputDocuments.Count > 0)
             {
-                using (System.IO.StreamWriter file = new System.IO.StreamWriter(@".\BadVertices.txt", true))
+                using (System.IO.StreamWriter file = new System.IO.StreamWriter(@"BadVertices.txt", true))
                 {
                     foreach (object doc in vResponse.BadInputDocuments)
                     {
@@ -171,7 +173,7 @@
                     }
                 }
 
-                using (System.IO.StreamWriter file = new System.IO.StreamWriter(@".\BadEdges.txt", true))
+                using (System.IO.StreamWriter file = new System.IO.StreamWriter(@"BadEdges.txt", true))
                 {
                     foreach (object doc in eResponse.BadInputDocuments)
                     {
@@ -183,7 +185,7 @@
             // Cleanup on finish if set in config.
             if (bool.Parse(ConfigurationManager.AppSettings["ShouldCleanupOnFinish"]))
             {
-                Trace.TraceInformation("Deleting Database {0}", DatabaseName);
+                Trace.TraceInformation($"Deleting Database {DatabaseName}");
                 await client.DeleteDatabaseAsync(UriFactory.CreateDatabaseUri(DatabaseName));
             }
 

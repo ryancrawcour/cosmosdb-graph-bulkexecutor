@@ -1,9 +1,10 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using GraphBulkImporter;
 using System;
 using System.Linq;
+
+using GraphBulkImporter;
 using Microsoft.Azure.CosmosDB.BulkExecutor.Graph.Element;
-using System.Collections;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
 
 namespace Test
 {
@@ -11,29 +12,29 @@ namespace Test
     public class ToGremlinVertexTests
     {
         [TestMethod]
-        [ExpectedException(typeof(ArgumentException))]
-        public void NoIdNoPKTest()
+        [ExpectedException(typeof(MissingFieldException))]
+        public void NoId_NoPK()
         {
-            (FirstName: "Joe", LastName: "Franks").ToGremlinVertex();
+            new { FirstName="Joe", LastName= "Franks" }.ToGremlinVertex();
         }
 
         [TestMethod]
-        [ExpectedException(typeof(ArgumentException))]
-        public void IdButNoPKTest()
+        [ExpectedException(typeof(MissingFieldException))]
+        public void SetId_NoPK()
         {
-            (FirstName: "Joe", LastName: "Franks").ToGremlinVertex();
+            new { Id = "1234567890" }.ToGremlinVertex();
         }
         
         [TestMethod]
-        [ExpectedException(typeof(ArgumentException))]
-        public void PKButNoIdTest()
+        [ExpectedException(typeof(MissingFieldException))]
+        public void SetPK_NoId()
         {
-            (FirstName: "Joe", LastName: "Franks").ToGremlinVertex();
+            new { PartitionKey = "1" }.ToGremlinVertex();
         }
 
         [TestMethod]
         // test all case variations of id, Id, and ID
-        public void IdTest()
+        public void CaseInsensitiveIdProperty()
         {
             const string idval = "12345";
             const string pkval = "pk";
@@ -53,7 +54,7 @@ namespace Test
 
         [TestMethod]
         // test all case variations of partitionkey, partitionKey, and PartitionKey, PARTITIONKEY
-        public void PkTest()
+        public void CaseInsensitivePkProperty()
         {
             const string idval = "id";
             const string pkval = "pk value";
@@ -73,7 +74,7 @@ namespace Test
 
         [TestMethod]
         //we expect the GremlinVertex Label property to be the type name of the object we're converting
-        public void LabelTest()
+        public void NoLabel_SetToTypeName()
         {
             var obj = new { id = "id", partitionKey = "pk" };
             var labelval = obj.GetType().Name;
@@ -83,22 +84,7 @@ namespace Test
         }
 
         [TestMethod]
-        public void SettingIdPkLabelTest()
-        {
-            var idval = "id";
-            var pkval = "pk";
-            var labelval = "label";
-
-            var obj = new { identifier = idval, pk = pkval };
-
-            var gv = obj.ToGremlinVertex("identifier", "pk", labelval);
-            Assert.AreEqual(idval, gv.Id);
-            Assert.AreEqual(labelval, gv.Label);
-            Assert.AreEqual(pkval, gv.GetVertexProperties("partitionKey").FirstOrDefault().Value);
-        }
-
-        [TestMethod]
-        public void Test()
+        public void IdAndPkExistsNoLabel()
         {
             var idval = "id";
             var pkval = "pk";
@@ -126,23 +112,18 @@ namespace Test
             Assert.AreEqual("someval", nestedProp.GetType().GetProperty("someprop").GetValue(nestedProp));
         }
 
-        internal class Person
-        {
-            public string Name => "person";
-            public int Age => 10;
-        }
-
         [TestMethod]
-        public void Test2()
+        public void SetIdPkAndLabel()
         {
-            var p = new Person();
+            var obj = new { Name = "person", Age = 10 };
+
             //use the Name prop of the Person as the Id value
             //use the Age prop of the Person as the value for the partitionKey GremlinVertexProperty
-            var gv = p.ToGremlinVertex(idProperty:"Name", partitionKeyProperty:"Age", label:"foo");
+            var gv = obj.ToGremlinVertex(idProperty:"Name", partitionKeyProperty:"Age", vertexLabel:"label");
 
-            Assert.AreEqual(p.Name, gv.Id);
-            Assert.AreEqual("foo", gv.Label); 
-            Assert.AreEqual(p.Age, gv.GetVertexProperties("partitionKey").FirstOrDefault().Value);
+            Assert.AreEqual(obj.Name, gv.Id);
+            Assert.AreEqual("label", gv.Label); 
+            Assert.AreEqual(obj.Age, gv.GetVertexProperties("partitionKey").FirstOrDefault().Value);
             Assert.IsTrue(gv.GetVertexProperties().Count<GremlinVertexProperty>() == 3);
         }
     }

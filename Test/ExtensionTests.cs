@@ -16,28 +16,38 @@ namespace Test
     {
         [TestMethod]
         [ExpectedException(typeof(MissingFieldException))]
-        public void NoId_NoPK()
+        public void NoIdNoPK()
         {
             new { FirstName = "Joe", LastName = "Franks" }.ToGremlinVertex();
         }
 
         [TestMethod]
         [ExpectedException(typeof(MissingFieldException))]
-        public void SetId_NoPK()
+        public void SetIdNoPK()
         {
             new { Id = "1234567890" }.ToGremlinVertex();
         }
 
         [TestMethod]
         [ExpectedException(typeof(MissingFieldException))]
-        public void SetPK_NoId()
+        public void SetPKNoId()
         {
             new { PartitionKey = "1" }.ToGremlinVertex();
         }
 
+        [ExpectedException(typeof(MissingFieldException))]
+        [DataTestMethod]
+        [DataRow("Id", "")]
+        [DataRow("", "partitionKey")]
+        // test all case variations of id, Id, and ID
+        public void SetEmptyIdAndPk(string idVal, string pkVal)
+        {
+            new { Id =idVal, LastName = pkVal}.ToGremlinVertex();
+        }
+
         [TestMethod]
         // test all case variations of id, Id, and ID
-        public void CaseInsensitiveIdProperty()
+        public void SetIdPropertyCaseVariations()
         {
             const string idval = "12345";
             const string pkval = "pk";
@@ -57,7 +67,7 @@ namespace Test
 
         [TestMethod]
         // test all case variations of partitionkey, partitionKey, and PartitionKey, PARTITIONKEY
-        public void CaseInsensitivePkProperty()
+        public void SetPkPropertyCaseVariations()
         {
             const string idval = "id";
             const string pkval = "pk value";
@@ -77,7 +87,7 @@ namespace Test
 
         [TestMethod]
         //we expect the GremlinVertex Label property to be the type name of the object we're converting
-        public void NoLabel_SetToTypeName()
+        public void NoLabelSet()
         {
             var obj = new { id = "id", partitionKey = "pk" };
             var labelval = obj.GetType().Name;
@@ -116,7 +126,7 @@ namespace Test
         }
 
         [TestMethod]
-        public void SetIdPkAndLabel()
+        public void SetsIdPkAndLabel()
         {
             var obj = new { Name = "person", Age = 10 };
 
@@ -145,10 +155,11 @@ namespace Test
         }
 
         [DataTestMethod]
+        [DataRow("Id", "PartitionKey")]
         [DataRow("id", "partitionkey")]
         [DataRow("iD", "partitionKey")]
-        [DataRow("ID", "PARtitionKey")]
-        public void BuildsFromExpandObjectWithDifferentCasingVariations(string idPropertyName, string partitionKeyPropertyName)
+        [DataRow("ID", "PARTITIONKEY")]
+        public void BuildsFromExpandoObjectWithDifferentCasingVariations(string idPropertyName, string partitionKeyPropertyName)
         {
             const string idValue = "id";
             const string primaryKeyValue = "pk value";

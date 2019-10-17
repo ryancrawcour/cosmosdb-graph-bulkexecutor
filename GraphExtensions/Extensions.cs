@@ -4,9 +4,9 @@ using System.Reflection;
 
 using Microsoft.Azure.CosmosDB.BulkExecutor.Graph.Element;
 
-namespace GraphBulkImporter
+namespace CosmosDB.Graph.Extensions
 {
-    public static class Extension
+    public static class Extensions
     {
         /// <summary>
         /// Turns an object in to a GremlinVertex with id & label, and a property bag of all other properties

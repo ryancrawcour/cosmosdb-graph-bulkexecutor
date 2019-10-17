@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 
-using GraphBulkImporter;
+using CosmosDB.Graph.Extensions;
 using Microsoft.Azure.CosmosDB.BulkExecutor.Graph.Element;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -15,7 +15,7 @@ namespace Test
         [ExpectedException(typeof(MissingFieldException))]
         public void NoId_NoPK()
         {
-            new { FirstName="Joe", LastName= "Franks" }.ToGremlinVertex();
+            new { FirstName = "Joe", LastName = "Franks" }.ToGremlinVertex();
         }
 
         [TestMethod]
@@ -24,7 +24,7 @@ namespace Test
         {
             new { Id = "1234567890" }.ToGremlinVertex();
         }
-        
+
         [TestMethod]
         [ExpectedException(typeof(MissingFieldException))]
         public void SetPK_NoId()
@@ -119,10 +119,10 @@ namespace Test
 
             //use the Name prop of the Person as the Id value
             //use the Age prop of the Person as the value for the partitionKey GremlinVertexProperty
-            var gv = obj.ToGremlinVertex(idProperty:"Name", partitionKeyProperty:"Age", vertexLabel:"label");
+            var gv = obj.ToGremlinVertex(idProperty: "Name", partitionKeyProperty: "Age", vertexLabel: "label");
 
             Assert.AreEqual(obj.Name, gv.Id);
-            Assert.AreEqual("label", gv.Label); 
+            Assert.AreEqual("label", gv.Label);
             Assert.AreEqual(obj.Age, gv.GetVertexProperties("partitionKey").FirstOrDefault().Value);
             Assert.IsTrue(gv.GetVertexProperties().Count<GremlinVertexProperty>() == 3);
         }
